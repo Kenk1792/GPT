@@ -1,0 +1,56 @@
+project:
+  name: okx_quant_research
+  timezone: UTC
+  log_level: INFO
+
+storage:
+  sqlite_path: data/research.db
+  parquet_dir: data/parquet
+  output_dir: outputs
+
+okx:
+  base_url: https://www.okx.com
+  bar: 1H
+  top_n: 200
+  quote_ccy: USDT
+  candle_limit: 300
+
+onchain:
+  etherscan_base_url: https://api.etherscan.io/api
+  etherscan_api_key_env: ETHERSCAN_API_KEY
+  confirm_delay_seconds: 24
+  index_delay_seconds: 120
+  chain: ethereum
+  poll_days: 30
+  cex_addresses:
+    - 0x28C6c06298d514Db089934071355E5743bf21d60
+    - 0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549
+
+backtest:
+  init_nav: 100000
+  fee_bps: 5
+  slippage_bps: 3
+  max_leverage: 2.0
+  per_trade_risk: 0.01
+  max_drawdown_halt: 0.2
+  daily_loss_halt: 0.05
+  atr_stop_mult: 2.5
+  take_profit_mult: 3.5
+  max_holding_bars: 24
+  walk_forward_splits: 3
+
+strategy:
+  use_chanlun: true
+  use_elliott: true
+  long_nbi_quantile: 0.8
+  short_nbi_quantile: 0.2
+  consensus_burst_z: 1.5
+
+email:
+  enabled: false
+  smtp_server: smtp.qq.com
+  smtp_port: 465
+  sender_env: QQ_MAIL_USER
+  auth_code_env: QQ_MAIL_AUTH_CODE
+  receiver: your_qq_mail@qq.com
+  send_interval_minutes: 60
