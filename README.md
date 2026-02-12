@@ -45,6 +45,15 @@ logs/
 
 > 说明：你要求“图文”，我这里给的是**可直接照做的逐步操作说明**（每一步都写“点哪里 + 输入什么 + 应看到什么”）。
 
+## 2.1 先解释你截图里的“错误”
+
+你截图中的 `apt` 实际是**成功执行**的（最后是 `0 upgraded, 3 newly installed...`，并且 `Setting up ... done`）。
+真正的问题是：终端里出现了你手工粘贴串行命令时的拼接污染（例如 `pytyuo` 这类无效片段），这会让后续命令不可复现。
+
+为避免再次发生，下面改成**脚本化一键安装**，不要再手工拼长命令。
+
+---
+
 ### Step 1：打开 Vultr 网页控制台（VNC）
 1. 登录 Vultr。
 2. 点击你的实例。
@@ -53,15 +62,26 @@ logs/
 
 **应看到**：命令行提示符，比如 `ubuntu@xxxx:~$`。
 
-### Step 2：安装基础依赖
+### Step 2：安装基础依赖（推荐用脚本，避免粘贴错误）
 在终端输入：
 
 ```bash
-sudo apt update
-sudo apt install -y git python3.12 python3.12-venv python3-pip
+cd /workspace/GPT
+bash scripts/bootstrap_vultr.sh
 ```
 
-**应看到**：最后出现 `Setting up ...`，没有 `E: Unable` 报错。
+**应看到**（关键几行）：
+- `[1/7] apt update`
+- `[6/7] install requirements`
+- `Listing 'src'...` 和 `Listing 'run'...`
+- `Bootstrap completed successfully.`
+
+如果你坚持手工安装（不推荐），请只复制下面两行，不要混入其它字符：
+
+```bash
+sudo apt update -y
+sudo apt install -y git python3.12 python3.12-venv python3-pip ca-certificates
+```
 
 ### Step 3：准备两个 GitHub 仓库（重点：区分）
 你说你有两个仓库，建议：
@@ -228,6 +248,8 @@ PY
 ---
 
 ## 8. 常见错误与不踩坑清单
+
+> 你截图那类情况，本质不是 apt 仓库问题，而是终端粘贴字符串污染。解决方法：只运行脚本 `bash scripts/bootstrap_vultr.sh`。
 
 1. `No module named pandas`：说明没激活虚拟环境。
    - 先 `source .venv/bin/activate`
