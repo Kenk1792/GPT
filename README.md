@@ -47,110 +47,94 @@ logs/
 
 ## 2.0 先做 20 秒路径自检（必须做）
 
+> 你截图里的问题是：机器上根本没有 `/workspace`，所以所有 `/workspace/GPT` 命令都会失败。
+
 先复制这一段（整段复制，不要改字母）：
 
 ```bash
 pwd
+ls -lah /
 ls -lah /workspace
-ls -lah /workspace/GPT
 ```
 
-你必须看到：
-- `pwd` 是有效路径（不是拼错的 `/workspqce`）
-- `/workspace/GPT` 目录存在
-- 目录内有 `README.md`、`requirements.txt`、`scripts/`
-
-如果 `/workspace/GPT` 不存在，先执行：
+如果第三条显示 `No such file or directory`，这就是根因，先执行：
 
 ```bash
-cd /workspace
-git clone git@github.com:你的用户名/okx-quant-research.git GPT
-cd /workspace/GPT
+sudo mkdir -p /workspace
+sudo chown -R "$USER":"$USER" /workspace
 ```
 
 ---
 
-## 2.1 先解释你截图里的“错误”
+## 2.1 从第一步开始：先装系统依赖，再拉项目
 
-你截图中的 `apt` 实际是**成功执行**的（最后是 `0 upgraded, 3 newly installed...`，并且 `Setting up ... done`）。
-真正的问题是：终端里出现了你手工粘贴串行命令时的拼接污染（例如 `pytyuo` 这类无效片段），这会让后续命令不可复现。
-
-为避免再次发生，下面改成**脚本化一键安装**，不要再手工拼长命令。
-
----
-
-### Step 1：打开 Vultr 网页控制台（VNC）
-1. 登录 Vultr。
-2. 点击你的实例。
-3. 点击 `View Console` 或 `Launch Web Console`。
-4. 进入后看到 Ubuntu 登录界面，输入用户名密码。
-
-**应看到**：命令行提示符，比如 `ubuntu@xxxx:~$`。
-
-### Step 2：安装基础依赖（推荐用脚本，避免粘贴错误）
-在终端输入：
-
-```bash
-cd /workspace/GPT
-bash /workspace/GPT/scripts/bootstrap_vultr.sh
-```
-
-**应看到**（关键几行）：
-- `[1/8] apt update`
-- `[7/8] install requirements`
-- `Listing 'src'...` 和 `Listing 'run'...`
-- `Bootstrap completed successfully.`
-
-如果你坚持手工安装（不推荐），请只复制下面两行，不要混入其它字符：
+### Step 1：安装基础依赖（新机必做）
 
 ```bash
 sudo apt update -y
 sudo apt install -y git python3.12 python3.12-venv python3-pip ca-certificates
 ```
 
-### Step 3：准备两个 GitHub 仓库（重点：区分）
-你说你有两个仓库，建议：
+**应看到**：`Setting up ...`，最后返回 shell 提示符。
 
-- 仓库 A：`infra`（放部署脚本、文档）
-- 仓库 B：`okx-quant-research`（放本项目代码）
+### Step 2：配置 Git 身份
 
-#### 3.1 配置 Git 身份
 ```bash
 git config --global user.name "你的GitHub用户名"
 git config --global user.email "你的GitHub邮箱"
 ```
 
-#### 3.2 配置 SSH Key（推荐）
-```bash
-ssh-keygen -t ed25519 -C "你的GitHub邮箱"
-cat ~/.ssh/id_ed25519.pub
-```
-复制输出的整行公钥。
+### Step 3：拉代码（先测再 clone，不盲猜）
 
-网页操作：
-1. 打开 GitHub -> 右上角头像 -> `Settings`
-2. 左侧 `SSH and GPG keys`
-3. 点 `New SSH key`
-4. Title 输入 `vultr-ubuntu-24`
-5. 粘贴公钥，保存
+先测仓库可见性：
 
-测试：
 ```bash
-ssh -T git@github.com
+git ls-remote https://github.com/你的用户名/okx-quant-research.git
 ```
 
-**应看到**：`Hi <username>! You've successfully authenticated...`
+- 能返回 commit hash：说明可读，继续 `Step 3A`。
+- 若报认证错误：走 `Step 3B`（PAT），不要输入 GitHub 登录密码。
 
-#### 3.3 克隆“代码仓库 B”
+#### Step 3A：公有库
+
 ```bash
 cd /workspace
-git clone git@github.com:你的用户名/okx-quant-research.git GPT
-cd GPT
+git clone https://github.com/你的用户名/okx-quant-research.git GPT
+cd /workspace/GPT
 ```
 
-**应看到**：`Cloning into 'GPT'...`。
+#### Step 3B：私有库（HTTPS + PAT）
 
-> 如果你要同时拉仓库 A，可放到 `/workspace/infra`，不要与项目目录混用。
+1. GitHub -> `Settings` -> `Developer settings` -> `Personal access tokens` -> `Tokens (classic)` -> `Generate new token`。
+2. 勾选 `repo` 权限，复制 token。
+3. 执行：
+
+```bash
+cd /workspace
+git clone https://github.com/你的用户名/okx-quant-research.git GPT
+cd /workspace/GPT
+```
+
+出现提示时：
+- Username：填 GitHub 用户名
+- Password：粘贴 **PAT token**（不是登录密码）
+
+> 你有两个仓库时：
+> - 仓库 A：`infra`（脚本/文档）
+> - 仓库 B：`okx-quant-research`（本项目代码）
+
+### Step 4：运行项目一键安装（代码存在后再执行）
+
+```bash
+cd /workspace/GPT
+bash /workspace/GPT/scripts/bootstrap_vultr.sh
+```
+
+**应看到**（关键行）：
+- `[1/8] apt update`
+- `[7/8] install requirements`
+- `Listing 'src'...` / `Listing 'run'...`
+- `Bootstrap completed successfully.`
 
 ---
 
@@ -159,7 +143,7 @@ cd GPT
 ```bash
 cd /workspace/GPT
 python3.12 -m venv .venv
-source .venv/bin/activate
+source /workspace/GPT/.venv/bin/activate
 python -m pip install -U pip
 pip install -r requirements.txt
 ```
@@ -251,24 +235,32 @@ crontab -e
 
 ---
 
-## 7. nano 卡顿时的“分段写文件”方式（推荐）
+## 7. nano 卡顿时：逐文件粘贴 + 每次退出都先校验
 
-如果 VNC + nano 一次粘贴太大，你可按模块分段：
+> 只在你无法直接 clone 完整仓库时使用。优先使用“仓库完整版本”。
+
+每个文件都用这个固定流程（示例 `src/okx_client.py`）：
 
 ```bash
+cd /workspace/GPT
 nano src/okx_client.py
-# 粘贴一个文件后保存
 ```
 
-或使用更稳定的 here-doc：
+1) 粘贴该文件完整代码。  
+2) 保存退出：`Ctrl+O` 回车，`Ctrl+X`。  
+3) 立即检查：
 
 ```bash
-cat > src/okx_client.py <<'PY'
-# 代码内容
-PY
+python3 -m py_compile src/okx_client.py
 ```
 
-这种方式比 nano 大段粘贴更不容易卡顿。
+4) 每完成 3~5 个文件，再跑全局检查：
+
+```bash
+python3 -m compileall src run scripts
+```
+
+若任何一步报错，先修当前文件，**不要进入下一个 nano 文件**。
 
 ---
 
