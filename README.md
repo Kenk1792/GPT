@@ -1,100 +1,249 @@
-# OKX 永续合约量化研究系统（含链上聪明钱包评分）
+# OKX 永续合约量化研究系统（Vultr 1C1G 版）
 
-> 面向 1vCPU / 1GB RAM Vultr Ubuntu 24.04 的轻量化实现。默认 SQLite + Parquet，支持真实 API + 自动降级 mock。
+本项目针对你的服务器配置优化：Ubuntu 24.04 / 1 vCPU / 1GB RAM / 32GB NVMe。默认 `SQLite + Parquet`，避免 ClickHouse 额外成本。
 
-## 1. 功能概览
-- OKX SWAP Top200 获取 + 1h K 线拉取与存储。
-- 链上钱包种子读取、真实 API 拉取（Blockscout）与 `t_visible` 防未来函数。
-- Trader / Allocator 硬规则分类与 SmartScore(0-100)。
-- 链上因子输出：`T_NBI_1h/4h/1d`、`T_CONS_1h/4h/1d`、`A_ACC_7d/30d`、`A_CEX_DEP_Z_7d`。
-- 技术因子：EMA/SMA slope/ROC/MACD/ADX/ATR/HV/流动性 proxy。
-- 缠论结构量化（可开关）；波浪模块预留。
-- 回测：成本、滑点、MDD、Sharpe、Sortino、Calmar、WinRate、PF、换手。
-- 监控快照 + QQ 邮箱信号推送（每小时任务由 crontab 配置）。
+---
 
-## 2. 项目结构
+## 0. 你将得到什么
+
+- OKX SWAP Top200 + 1h K线抓取
+- 链上聪明钱包监控（真实 API 优先，失败自动降级 mock）
+- 钱包两类分类：Trader / Allocator
+- SmartScore(0-100) 每日榜单
+- 链上三大因子（1h/4h/1d，7d/30d）：
+  - Trader Net Buy Intensity (NBI)
+  - Trader Consensus
+  - Allocator Accumulation + CEX Deposit Risk Z
+- 技术特征 + 缠论状态识别 + 可选波浪状态识别
+- 回测（成本、滑点、风控、walk-forward）
+- QQ 邮箱信号发送（每小时）
+
+---
+
+## 1. 目录结构
+
 ```text
 config/
   settings.yaml
   wallets_seed_trader.txt
   wallets_seed_allocator.txt
-src/
 run/
-outputs/
+  run_fetch_okx.py
+  run_fetch_onchain.py
+  run_build_factors.py
+  run_backtest.py
+src/
+  ...（核心模块）
 data/
+outputs/
 logs/
 ```
 
-## 3. 在 Vultr + VNC 上逐步操作（图文步骤文字版）
+---
 
-### Step A: 登录与创建环境
-1. 在 Vultr 控制台点击实例 -> Console -> Launch Web Console (VNC)。
-2. 打开终端输入：
+## 2. Vultr + VNC 图文式步骤（逐步点击）
+
+> 说明：你要求“图文”，我这里给的是**可直接照做的逐步操作说明**（每一步都写“点哪里 + 输入什么 + 应看到什么”）。
+
+### Step 1：打开 Vultr 网页控制台（VNC）
+1. 登录 Vultr。
+2. 点击你的实例。
+3. 点击 `View Console` 或 `Launch Web Console`。
+4. 进入后看到 Ubuntu 登录界面，输入用户名密码。
+
+**应看到**：命令行提示符，比如 `ubuntu@xxxx:~$`。
+
+### Step 2：安装基础依赖
+在终端输入：
+
 ```bash
 sudo apt update
-sudo apt install -y python3.11 python3.11-venv git
+sudo apt install -y git python3.12 python3.12-venv python3-pip
 ```
-3. 进入项目目录：
+
+**应看到**：最后出现 `Setting up ...`，没有 `E: Unable` 报错。
+
+### Step 3：准备两个 GitHub 仓库（重点：区分）
+你说你有两个仓库，建议：
+
+- 仓库 A：`infra`（放部署脚本、文档）
+- 仓库 B：`okx-quant-research`（放本项目代码）
+
+#### 3.1 配置 Git 身份
+```bash
+git config --global user.name "你的GitHub用户名"
+git config --global user.email "你的GitHub邮箱"
+```
+
+#### 3.2 配置 SSH Key（推荐）
+```bash
+ssh-keygen -t ed25519 -C "你的GitHub邮箱"
+cat ~/.ssh/id_ed25519.pub
+```
+复制输出的整行公钥。
+
+网页操作：
+1. 打开 GitHub -> 右上角头像 -> `Settings`
+2. 左侧 `SSH and GPG keys`
+3. 点 `New SSH key`
+4. Title 输入 `vultr-ubuntu-24`
+5. 粘贴公钥，保存
+
+测试：
+```bash
+ssh -T git@github.com
+```
+
+**应看到**：`Hi <username>! You've successfully authenticated...`
+
+#### 3.3 克隆“代码仓库 B”
+```bash
+cd /workspace
+git clone git@github.com:你的用户名/okx-quant-research.git GPT
+cd GPT
+```
+
+**应看到**：`Cloning into 'GPT'...`。
+
+> 如果你要同时拉仓库 A，可放到 `/workspace/infra`，不要与项目目录混用。
+
+---
+
+## 3. Python 虚拟环境
+
 ```bash
 cd /workspace/GPT
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -U pip
+python -m pip install -U pip
 pip install -r requirements.txt
 ```
-预期最后出现 `Successfully installed ...`。
 
-### Step B: 运行全链路
+**应看到**：`Successfully installed ...`
+
+> 如果 `pip` 访问慢：
+
+```bash
+pip config set global.index-url https://pypi.org/simple
+```
+
+---
+
+## 4. 一键跑全流程（P0 验收）
+
+按顺序执行：
+
 ```bash
 python -m run.run_fetch_okx
 python -m run.run_fetch_onchain
 python -m run.run_build_factors
 python -m run.run_backtest
 ```
-预期输出：
-- `Saved ... tokens`
-- `Saved ... wallet activities`
-- `Saved ... wallet scores and ... factor rows`
-- `Backtest complete {...metrics...}`
 
-### Step C: 查看结果
+**你应看到的关键日志**：
+- `Saved XXX tokens`
+- `Saved XXX wallet activities`
+- `Saved XXX wallet scores and XXX factor rows`
+- `Backtest complete {...}`
+
+---
+
+## 5. 输出文件检查
+
 ```bash
-ls outputs
+ls -lah outputs
 ```
-应看到：
+
+至少应有：
 - `backtest_equity.csv`
 - `backtest_metrics.csv`
 - `backtest_metrics.json`
+- `backtest_walkforward.csv`
 - `backtest_plots.png`
 - `wallet_scoreboard.csv`
+- `wallet_top20_trader.csv`
+- `wallet_top20_allocator.csv`
 - `monitor_snapshot.csv`
 
-## 4. QQ 邮箱信号推送配置（每小时）
-1. 编辑 `config/settings.yaml`：`email.enabled: true`。
-2. 设置环境变量（QQ 邮箱 SMTP 授权码，不是登录密码）：
+---
+
+## 6. QQ 邮箱每小时发交易信号
+
+### Step 1：QQ 邮箱开启 SMTP
+网页里：QQ邮箱 -> 设置 -> 账户 -> POP3/IMAP/SMTP -> 开启 SMTP，拿到授权码。
+
+### Step 2：配置项目
+编辑 `config/settings.yaml`：
+- `email.enabled: true`
+- `email.sender`: 你的 QQ 邮箱
+- `email.receivers`: 收件人数组
+
+设置环境变量：
+
 ```bash
-export QQ_SMTP_AUTH_CODE='你的授权码'
+export QQ_SMTP_AUTH_CODE='你的QQ授权码'
 ```
-3. 手工运行一次：
+
+### Step 3：手动测试发送
+
 ```bash
 python -m run.run_backtest
 ```
-4. 设置每小时定时：
+
+有信号时会发邮件，格式：
+`币种、方向、建仓、止损、止盈`。
+
+### Step 4：crontab 每小时执行
+
 ```bash
 crontab -e
 ```
-添加：
+加入：
+
 ```cron
 0 * * * * cd /workspace/GPT && /workspace/GPT/.venv/bin/python -m run.run_backtest >> /workspace/GPT/logs/cron_backtest.log 2>&1
 ```
 
-## 5. 数据表
-SQLite 默认文件：`data/quant.db`。
-核心表：
-- `fact_wallet_activity`
-- `fact_wallet_score_daily`
-- `fact_token_smart_flow`
+---
 
-## 6. 常见问题
-- 若链上 API 限速或失败，系统会自动切换 mock 数据以保证主流程不崩溃。
-- 1GB 内存建议保留默认 `max_candles=400`，避免过量数据占用。
+## 7. nano 卡顿时的“分段写文件”方式（推荐）
+
+如果 VNC + nano 一次粘贴太大，你可按模块分段：
+
+```bash
+nano src/okx_client.py
+# 粘贴一个文件后保存
+```
+
+或使用更稳定的 here-doc：
+
+```bash
+cat > src/okx_client.py <<'PY'
+# 代码内容
+PY
+```
+
+这种方式比 nano 大段粘贴更不容易卡顿。
+
+---
+
+## 8. 常见错误与不踩坑清单
+
+1. `No module named pandas`：说明没激活虚拟环境。
+   - 先 `source .venv/bin/activate`
+2. `Missing candles/factors`：说明没按顺序运行四个脚本。
+3. 邮件不发：
+   - 检查 `email.enabled=true`
+   - 检查 `QQ_SMTP_AUTH_CODE`
+   - 检查是否真的产生了 `signal != 0`
+4. 链上 API 不稳定：
+   - 系统会自动 fallback mock，不会让主流程崩溃。
+
+---
+
+## 9. 一句话运行清单
+
+```bash
+source .venv/bin/activate && python -m run.run_fetch_okx && python -m run.run_fetch_onchain && python -m run.run_build_factors && python -m run.run_backtest
+```
+

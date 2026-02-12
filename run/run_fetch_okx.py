@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from src.config_loader import load_settings
 from src.data_store import DataStore
 from src.logger import setup_logger
@@ -17,24 +19,31 @@ def main() -> None:
         logger.warning("No instruments found")
         return
 
-    dim_token = uni[["token_id", "symbol"]].drop_duplicates().assign(chain="okx", contract_or_mint="", decimals=0, okx_instId=uni["instId"])
+    dim_token = (
+        uni[["token_id", "symbol", "instId"]]
+        .drop_duplicates("token_id")
+        .rename(columns={"instId": "okx_instId"})
+        .assign(chain="okx", contract_or_mint="", decimals=0)
+    )[["token_id", "symbol", "chain", "contract_or_mint", "decimals", "okx_instId"]]
+
     map_df = uni[["instId", "symbol", "token_id"]].rename(columns={"instId": "okx_instId"})
     ds.replace_df("dim_token", dim_token)
     ds.replace_df("map_okx_token", map_df)
     logger.info("Saved %s tokens", len(dim_token))
 
-    all_c = []
+    all_candles: list[pd.DataFrame] = []
     for inst in uni["instId"].tolist():
         c = okx.get_candles(inst, cfg["okx"]["bar"], cfg["okx"]["max_candles"])
         if c.empty:
             continue
-        token_id = uni.loc[uni["instId"].eq(inst), "token_id"].iloc[0]
-        c["token_id"] = token_id
-        all_c.append(c)
-    if not all_c:
+        c["token_id"] = uni.loc[uni["instId"].eq(inst), "token_id"].iloc[0]
+        all_candles.append(c)
+
+    if not all_candles:
         logger.warning("No candles downloaded")
         return
-    candles = __import__("pandas").concat(all_c, ignore_index=True).drop_duplicates(["ts", "instId"])
+
+    candles = pd.concat(all_candles, ignore_index=True).drop_duplicates(["ts", "instId"])
     ds.replace_df("okx_candles", candles[["ts", "instId", "open", "high", "low", "close", "volume", "volume_ccy"]])
     ds.write_parquet("okx_candles", candles)
     logger.info("Saved %s candles", len(candles))

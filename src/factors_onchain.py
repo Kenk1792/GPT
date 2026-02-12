@@ -42,7 +42,8 @@ def build_onchain_factors(activity: pd.DataFrame, wallet_score: pd.DataFrame, ok
 
     alloc = a[a["class"] == "Allocator"].copy()
     alloc["alloc_signed"] = np.where(alloc["action_type"].eq("buy"), alloc["amount_usd"], -alloc["amount_usd"])
-    agg = alloc.groupby(["ts", "token_id"], as_index=False).agg(allocator_net_buy_usd_1h=("alloc_signed", "sum"), allocator_cex_deposit_usd_1h=("amount_usd", "sum"))
+    alloc["cex_dep_usd"] = alloc.apply(lambda r: r["amount_usd"] if r["action_type"] == "transfer_out_to_cex" else 0.0, axis=1)
+    agg = alloc.groupby(["ts", "token_id"], as_index=False).agg(allocator_net_buy_usd_1h=("alloc_signed", "sum"), allocator_cex_deposit_usd_1h=("cex_dep_usd", "sum"))
     fac = fac.merge(agg, on=["ts", "token_id"], how="left").fillna(0)
     fac["allocator_net_buy_usd_7d"] = g["allocator_net_buy_usd_1h"].transform(lambda s: s.rolling(24 * 7).sum())
     fac["allocator_net_buy_usd_30d"] = g["allocator_net_buy_usd_1h"].transform(lambda s: s.rolling(24 * 30, min_periods=24).sum())
