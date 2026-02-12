@@ -45,6 +45,31 @@ logs/
 
 > 说明：你要求“图文”，我这里给的是**可直接照做的逐步操作说明**（每一步都写“点哪里 + 输入什么 + 应看到什么”）。
 
+## 2.0 先做 20 秒路径自检（必须做）
+
+先复制这一段（整段复制，不要改字母）：
+
+```bash
+pwd
+ls -lah /workspace
+ls -lah /workspace/GPT
+```
+
+你必须看到：
+- `pwd` 是有效路径（不是拼错的 `/workspqce`）
+- `/workspace/GPT` 目录存在
+- 目录内有 `README.md`、`requirements.txt`、`scripts/`
+
+如果 `/workspace/GPT` 不存在，先执行：
+
+```bash
+cd /workspace
+git clone git@github.com:你的用户名/okx-quant-research.git GPT
+cd /workspace/GPT
+```
+
+---
+
 ## 2.1 先解释你截图里的“错误”
 
 你截图中的 `apt` 实际是**成功执行**的（最后是 `0 upgraded, 3 newly installed...`，并且 `Setting up ... done`）。
@@ -67,12 +92,12 @@ logs/
 
 ```bash
 cd /workspace/GPT
-bash scripts/bootstrap_vultr.sh
+bash /workspace/GPT/scripts/bootstrap_vultr.sh
 ```
 
 **应看到**（关键几行）：
-- `[1/7] apt update`
-- `[6/7] install requirements`
+- `[1/8] apt update`
+- `[7/8] install requirements`
 - `Listing 'src'...` 和 `Listing 'run'...`
 - `Bootstrap completed successfully.`
 
@@ -260,6 +285,14 @@ PY
    - 检查是否真的产生了 `signal != 0`
 4. 链上 API 不稳定：
    - 系统会自动 fallback mock，不会让主流程崩溃。
+
+---
+
+## 9.5 一次性复制（推荐）
+
+```bash
+cd /workspace/GPT && bash /workspace/GPT/scripts/bootstrap_vultr.sh && source /workspace/GPT/.venv/bin/activate && python -m run.run_fetch_okx && python -m run.run_fetch_onchain && python -m run.run_build_factors && python -m run.run_backtest
+```
 
 ---
 

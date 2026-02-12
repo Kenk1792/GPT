@@ -1,34 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="${1:-/workspace/GPT}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_DIR="${1:-$DEFAULT_PROJECT_DIR}"
 PY_BIN="${PY_BIN:-python3.12}"
 
-echo "[1/7] apt update"
+if [[ ! -f "${PROJECT_DIR}/requirements.txt" ]]; then
+  echo "[ERROR] requirements.txt not found in: ${PROJECT_DIR}"
+  echo "[TIP] run: cd ${DEFAULT_PROJECT_DIR} && bash scripts/bootstrap_vultr.sh"
+  exit 1
+fi
+
+echo "[INFO] Using PROJECT_DIR=${PROJECT_DIR}"
+
+echo "[1/8] apt update"
 sudo apt update -y
 
-echo "[2/7] install base packages"
+echo "[2/8] install base packages"
 sudo apt install -y git "$PY_BIN" python3.12-venv python3-pip ca-certificates
 
-echo "[3/7] verify python/pip"
-$PY_BIN --version
+echo "[3/8] verify python/pip"
+"$PY_BIN" --version
 python3 -m pip --version || true
 
-echo "[4/7] create venv"
+echo "[4/8] enter project dir"
 cd "$PROJECT_DIR"
-$PY_BIN -m venv .venv
+pwd
+
+echo "[5/8] create venv"
+"$PY_BIN" -m venv .venv
 
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
-echo "[5/7] upgrade pip/setuptools/wheel"
+echo "[6/8] upgrade pip/setuptools/wheel"
 python -m pip install --upgrade pip setuptools wheel
 
-echo "[6/7] install requirements"
+echo "[7/8] install requirements"
 pip install -r requirements.txt
 
-echo "[7/7] smoke check"
-python -m compileall src run
+echo "[8/8] smoke check"
+python -m compileall src run scripts
 
 echo "Bootstrap completed successfully."
 echo "Next run:"
