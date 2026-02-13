@@ -1,0 +1,7 @@
+pandas==2.2.2
+numpy==1.26.4
+requests==2.32.3
+PyYAML==6.0.2
+matplotlib==3.9.2
+scikit-learn==1.5.1
+pyarrow==17.0.0

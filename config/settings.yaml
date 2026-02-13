@@ -1,0 +1,54 @@
+project:
+  name: okx_quant_research
+  timezone: UTC
+  base_currency: USDT
+
+paths:
+  db_path: data/quant.db
+  parquet_dir: data/parquet
+  output_dir: outputs
+  log_dir: logs
+
+okx:
+  base_url: https://www.okx.com
+  bar: 1H
+  top_n: 200
+  quote_ccy: USDT
+  max_candles: 400
+
+onchain:
+  provider: blockscout
+  base_url: https://eth.blockscout.com/api/v2
+  confirm_delay_seconds: 30
+  index_delay_seconds: 90
+  poll_limit_per_wallet: 100
+  use_fallback_mock: true
+
+backtest:
+  initial_nav: 100000
+  maker_fee_bps: 2.0
+  taker_fee_bps: 5.0
+  slippage_bps: 3.0
+  risk_per_trade: 0.01
+  max_leverage: 2.0
+  max_daily_loss: 0.05
+  max_drawdown: 0.2
+
+strategy:
+  use_chanlun: true
+  use_elliott: false
+  nbi_long_quantile: 0.8
+  nbi_short_quantile: 0.2
+  consensus_burst_quantile: 0.85
+
+email:
+  enabled: false
+  smtp_host: smtp.qq.com
+  smtp_port: 465
+  sender: your_qq@qq.com
+  password_env: QQ_SMTP_AUTH_CODE
+  receivers:
+    - your_qq@qq.com
+
+scheduler:
+  signal_interval_minutes: 60
